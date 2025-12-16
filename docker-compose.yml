@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: livekit-server
+    ports:
+      - "7880:7880"
+      - "7881:7881"
+      - "50000-50100:50000-50100/udp"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml
+    command: --config /etc/livekit.yaml
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7880"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: voice-agent
+    depends_on:
+      livekit:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      - LIVEKIT_URL=ws://livekit:7880
+    restart: unless-stopped

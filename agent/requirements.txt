@@ -1,0 +1,9 @@
+# LiveKit Agents SDK with plugins
+livekit-agents[openai,silero,deepgram,elevenlabs,cartesia,turn-detector]~=1.2
+livekit-plugins-noise-cancellation~=0.2
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Logging
+structlog>=24.0.0
