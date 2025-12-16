@@ -14,63 +14,113 @@ While Vapi.ai offers a convenient SaaS solution, this project demonstrates engin
 ## Architecture
 
 ```
-Frontend (Web) → LiveKit Server (WebRTC) → Agent Worker (Python)
-                                              ↓
-                              VAD → STT → LLM → TTS
-                           (Silero) (Deepgram) (GPT-4o) (ElevenLabs)
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    Frontend     │────▶│  LiveKit Server │◀────│   Voice Agent   │
+│  (Browser UI)   │     │    (WebRTC)     │     │    (Python)     │
+└─────────────────┘     └─────────────────┘     └─────────────────┘
+                                                        │
+                              ┌─────────────────────────┼─────────────────────────┐
+                              │                         │                         │
+                              ▼                         ▼                         ▼
+                        ┌──────────┐             ┌──────────┐             ┌──────────┐
+                        │   STT    │             │   LLM    │             │   TTS    │
+                        │(Deepgram)│             │(OpenRouter)│           │(Cartesia)│
+                        └──────────┘             └──────────┘             └──────────┘
 ```
 
 ## Quick Start
 
-### Prerequisites
+### 1. Get API Keys
 
-- Docker & Docker Compose
-- API Keys: OpenAI, Deepgram, ElevenLabs (optional)
+| Service | Purpose | Sign Up |
+|---------|---------|---------|
+| OpenRouter | LLM (GPT-4o, Claude, etc.) | https://openrouter.ai/keys |
+| Deepgram | Speech-to-Text | https://console.deepgram.com ($200 free) |
+| Cartesia | Text-to-Speech | https://play.cartesia.ai/ |
 
-### Setup
+### 2. Configure Environment
 
 ```bash
-# 1. Clone the repository
-git clone <repo-url>
-cd ftai-voice-agent
-
-# 2. Configure environment
+# Copy the example environment file
 cp .env.example .env
-# Edit .env with your API keys
 
-# 3. Start services
+# Edit .env and add your API keys
+```
+
+### 3. Start Services
+
+```bash
+# Start all services (LiveKit, Agent, Frontend)
 docker-compose up -d
 
-# 4. Open the frontend
-open http://localhost:3000
+# View logs
+docker-compose logs -f agent
 ```
+
+### 4. Use the Voice Agent
+
+Open http://localhost:3000 in your browser and click "Connect" to start talking!
 
 ## Project Structure
 
 ```
 ftai-voice-agent/
-├── agent/           # Python voice agent
-├── frontend/        # Web UI (LiveKit Playground)
-├── scripts/         # Setup and utility scripts
-├── docs/            # Documentation
-├── docker-compose.yml
-└── PLAN.md          # Detailed project plan
+├── agent/               # Python voice agent
+│   ├── agent.py         # Main agent code
+│   ├── config.py        # Configuration management
+│   ├── prompts/         # System prompts
+│   └── Dockerfile
+├── frontend/            # Web UI (LiveKit Playground)
+├── scripts/             # Setup scripts
+├── docker-compose.yml   # One-command startup
+├── livekit.yaml         # LiveKit server config
+└── PLAN.md              # Detailed project plan
 ```
-
-## Development Status
-
-See [PLAN.md](./PLAN.md) for detailed implementation plan and GitHub issues.
 
 ## Tech Stack
 
-| Component | Technology |
-|-----------|------------|
-| Media Server | LiveKit |
-| Agent Framework | LiveKit Agents SDK |
-| VAD | Silero |
-| STT | Deepgram |
-| LLM | OpenAI GPT-4o |
-| TTS | ElevenLabs / OpenAI |
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Media Server | LiveKit | WebRTC infrastructure |
+| Agent Framework | LiveKit Agents SDK v1.2 | Voice pipeline orchestration |
+| VAD | Silero | Voice activity detection |
+| STT | Deepgram | Speech-to-text |
+| LLM | OpenRouter | Access to GPT-4o, Claude, etc. |
+| TTS | Cartesia | Text-to-speech |
+
+## Development
+
+### Running Locally (without Docker)
+
+```bash
+# Terminal 1: Start LiveKit server
+docker run --rm -p 7880:7880 -p 7881:7881 -p 50000-50100:50000-50100/udp \
+  -v $(pwd)/livekit.yaml:/etc/livekit.yaml \
+  livekit/livekit-server --config /etc/livekit.yaml
+
+# Terminal 2: Start the agent
+cd agent
+pip install -r requirements.txt
+python agent.py dev
+
+# Terminal 3: Start the frontend
+cd frontend
+pnpm install
+pnpm dev
+```
+
+### Customizing the Agent
+
+Edit `agent/prompts/default.txt` to change the agent's personality and instructions.
+
+## Roadmap
+
+See [GitHub Issues](https://github.com/woolnerd/ftai-voice-agent/issues) for planned features:
+
+- [ ] Latency optimization (<500ms)
+- [ ] Error handling & resilience
+- [ ] GCP Cloud Run deployment
+- [ ] Full GKE production setup
 
 ## License
 
