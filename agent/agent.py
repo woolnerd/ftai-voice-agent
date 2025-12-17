@@ -17,9 +17,13 @@ from config import config
 # Load environment variables
 load_dotenv()
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging - use print for visibility in dev mode
+logging.basicConfig(level=logging.INFO, format='%(message)s')
 logger = logging.getLogger("latency")
+
+def log(msg):
+    """Print to stdout for visibility in dev mode."""
+    print(msg, flush=True)
 
 
 class VoiceAssistant(Agent):
@@ -41,7 +45,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Create LLM - use Groq for ultra-fast inference
     llm_model = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-    logger.info(f"[CONFIG] Using Groq LLM model: {llm_model}")
+    log(f"[CONFIG] Using Groq LLM model: {llm_model}")
     llm = groq.LLM(model=llm_model)
 
     # Create the agent session with STT-LLM-TTS pipeline
@@ -64,15 +68,15 @@ async def entrypoint(ctx: agents.JobContext):
         if "LLM" in metrics_type:
             ttft = getattr(metrics, 'ttft', None)  # time to first token
             if ttft:
-                logger.info(f"[METRICS] LLM TTFT: {ttft*1000:.0f}ms")
+                log(f"[METRICS] LLM TTFT: {ttft*1000:.0f}ms")
         elif "TTS" in metrics_type:
             ttfb = getattr(metrics, 'ttfb', None)  # time to first byte
             if ttfb:
-                logger.info(f"[METRICS] TTS TTFB: {ttfb*1000:.0f}ms")
+                log(f"[METRICS] TTS TTFB: {ttfb*1000:.0f}ms")
         elif "STT" in metrics_type:
             duration = getattr(metrics, 'duration', None)
             if duration:
-                logger.info(f"[METRICS] STT duration: {duration*1000:.0f}ms")
+                log(f"[METRICS] STT duration: {duration*1000:.0f}ms")
 
     @session.on("user_input_transcribed")
     def on_user_input_transcribed(event: UserInputTranscribedEvent):
@@ -80,30 +84,30 @@ async def entrypoint(ctx: agents.JobContext):
         if event.is_final:
             user_finished_time = time.time()
             transcript = event.transcript[:50] + "..." if len(event.transcript) > 50 else event.transcript
-            logger.info(f"[LATENCY] User speech final: '{transcript}'")
+            log(f"[LATENCY] User speech final: '{transcript}'")
 
     @session.on("agent_state_changed")
     def on_agent_state_changed(event: AgentStateChangedEvent):
         nonlocal user_finished_time, thinking_start_time
         new_state = str(event.new_state)
-        logger.info(f"[LATENCY] Agent state: {event.old_state} -> {new_state}")
+        log(f"[LATENCY] Agent state: {event.old_state} -> {new_state}")
 
         # Track when agent starts thinking (processing user input)
         if "thinking" in new_state:
             thinking_start_time = time.time()
             if user_finished_time:
                 stt_latency = (thinking_start_time - user_finished_time) * 1000
-                logger.info(f"[LATENCY] STT->Think: {stt_latency:.0f}ms")
+                log(f"[LATENCY] STT->Think: {stt_latency:.0f}ms")
 
         # Track when agent starts speaking (end-to-end latency)
         elif "speaking" in new_state:
             now = time.time()
             if thinking_start_time:
                 think_to_speak = (now - thinking_start_time) * 1000
-                logger.info(f"[LATENCY] Think->Speak: {think_to_speak:.0f}ms (LLM + TTS)")
+                log(f"[LATENCY] Think->Speak: {think_to_speak:.0f}ms (LLM + TTS)")
             if user_finished_time:
                 total_latency = (now - user_finished_time) * 1000
-                logger.info(f"[LATENCY] *** TOTAL: {total_latency:.0f}ms *** (user done -> agent speaks)")
+                log(f"[LATENCY] *** TOTAL: {total_latency:.0f}ms *** (user done -> agent speaks)")
                 user_finished_time = None
 
     # Start the session
@@ -117,7 +121,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Generate initial greeting
     await session.generate_reply(
-        instructions="Greet the user warmly and introduce yourself as FTAI Voice Assistant. Ask how you can help them today."
+        instructions="Greet the caller warmly and introduce yourself as Sunny Hills Realty. Ask how you can help them today with their property search."
     )
 
 

@@ -1,0 +1,19 @@
+services:
+  voice-agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: ftai-voice-agent
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # LiveKit Cloud - these override .env if needed
+      - LIVEKIT_URL=${LIVEKIT_URL}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET}
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
