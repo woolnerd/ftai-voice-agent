@@ -1,13 +1,8 @@
-version: '3.8'
-
 services:
   livekit:
     image: livekit/livekit-server:latest
     container_name: livekit-server
-    ports:
-      - "7880:7880"
-      - "7881:7881"
-      - "50000-50100:50000-50100/udp"
+    network_mode: host
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml
     command: --config /etc/livekit.yaml
@@ -23,13 +18,14 @@ services:
       context: ./agent
       dockerfile: Dockerfile
     container_name: voice-agent
+    network_mode: host
     depends_on:
       livekit:
         condition: service_healthy
     env_file:
       - .env
     environment:
-      - LIVEKIT_URL=ws://livekit:7880
+      - LIVEKIT_URL=ws://localhost:7880
     restart: unless-stopped
 
   frontend:
@@ -37,8 +33,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: voice-frontend
-    ports:
-      - "3000:3000"
+    network_mode: host
     depends_on:
       - livekit
     environment:
