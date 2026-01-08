@@ -18,6 +18,7 @@ from livekit.plugins import noise_cancellation, silero, openai, deepgram, cartes
 
 from config import config
 from calendar_service import calendar_service
+from email_service import email_service
 
 # Load environment variables
 load_dotenv()
@@ -73,6 +74,24 @@ def parse_date(date_str: str) -> datetime:
 
     # Default to tomorrow if we can't parse
     return today + timedelta(days=1)
+
+
+@function_tool()
+async def end_call(
+    context: RunContext,
+    reason: Annotated[str, "Brief reason for ending the call, e.g. 'booking complete', 'caller said goodbye'"],
+) -> str:
+    """End the call after saying goodbye. Use this when the conversation is complete - after a booking is confirmed or when the caller says goodbye."""
+    log(f"[TOOL] end_call called: {reason}")
+
+    # Schedule disconnect after a brief delay to allow final message to play
+    import asyncio
+    async def delayed_disconnect():
+        await asyncio.sleep(3)  # Wait for goodbye message to finish
+        await context.session.aclose()
+
+    asyncio.create_task(delayed_disconnect())
+    return "Call ending. Say a warm goodbye."
 
 
 @function_tool()
@@ -164,12 +183,29 @@ async def book_appointment(
         )
         if result:
             log(f"[TOOL] Calendar event created: {result}")
+
+            # Send confirmation email
+            email_sent = email_service.send_confirmation_email(
+                customer_name=customer_name,
+                customer_email=customer_email,
+                service_type=service,
+                appointment_date=start_time,
+            )
+            if email_sent:
+                log(f"[TOOL] Confirmation email sent to {customer_email}")
+
             return f"Appointment confirmed! {customer_name} is booked for {service} on {day_name}, {date_str} at {time_str}. A confirmation email has been sent to {customer_email}."
         else:
             return f"I'm sorry, there was an issue booking that time slot. It may have just been taken. Would you like to try a different time?"
 
-    # Fallback if calendar not configured
+    # Fallback if calendar not configured (still try to send email)
     log("[TOOL] Using mock booking (calendar not configured)")
+    email_service.send_confirmation_email(
+        customer_name=customer_name,
+        customer_email=customer_email,
+        service_type=service,
+        appointment_date=start_time,
+    )
     return f"Appointment confirmed! {customer_name} is booked for {service} on {day_name}, {date_str} at {time_str}. A confirmation email will be sent to {customer_email}."
 
 
@@ -179,7 +215,7 @@ class VoiceAssistant(Agent):
     def __init__(self) -> None:
         super().__init__(
             instructions=config.load_prompt("medspa"),
-            tools=[check_availability, book_appointment],
+            tools=[check_availability, book_appointment, end_call],
         )
 
 
