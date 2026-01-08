@@ -79,19 +79,19 @@ def parse_date(date_str: str) -> datetime:
 @function_tool()
 async def end_call(
     context: RunContext,
-    reason: Annotated[str, "Brief reason for ending the call, e.g. 'booking complete', 'caller said goodbye'"],
+    reason: Annotated[str, "Brief reason for ending the call, e.g. 'caller said goodbye', 'caller is done'"],
 ) -> str:
-    """End the call after saying goodbye. Use this when the conversation is complete - after a booking is confirmed or when the caller says goodbye."""
+    """End the call. ONLY use this when the caller says goodbye or indicates they are done. Do NOT use immediately after booking - wait for the caller to respond first."""
     log(f"[TOOL] end_call called: {reason}")
 
-    # Schedule disconnect after a brief delay to allow final message to play
+    # Schedule disconnect after delay to allow final message to play fully
     import asyncio
     async def delayed_disconnect():
-        await asyncio.sleep(3)  # Wait for goodbye message to finish
+        await asyncio.sleep(6)  # Wait for goodbye message to finish
         await context.session.aclose()
 
     asyncio.create_task(delayed_disconnect())
-    return "Call ending. Say a warm goodbye."
+    return "Say a warm goodbye, then the call will end."
 
 
 @function_tool()
