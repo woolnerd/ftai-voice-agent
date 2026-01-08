@@ -24,6 +24,8 @@ class CalendarService:
         self.credentials_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "credentials.json")
         # For domain-wide delegation, impersonate this user
         self.delegate_user = os.getenv("GOOGLE_DELEGATE_USER", self.calendar_id)
+        # Timezone for appointments (default to Eastern)
+        self.timezone = os.getenv("CALENDAR_TIMEZONE", "America/New_York")
         self._service = None
 
     @property
@@ -136,11 +138,11 @@ class CalendarService:
             + (f"\nNotes: {notes}" if notes else ""),
             "start": {
                 "dateTime": start_time.isoformat(),
-                "timeZone": "America/Los_Angeles",
+                "timeZone": self.timezone,
             },
             "end": {
                 "dateTime": end_time.isoformat(),
-                "timeZone": "America/Los_Angeles",
+                "timeZone": self.timezone,
             },
             "attendees": [
                 {"email": customer_email},
