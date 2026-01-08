@@ -1,6 +1,7 @@
 """Configuration management for the voice agent."""
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -49,10 +50,15 @@ class Config:
 
     @classmethod
     def load_prompt(cls, name: str = "default") -> str:
-        """Load a prompt from the prompts directory."""
+        """Load a prompt from the prompts directory with dynamic variable substitution."""
         prompt_file = cls.PROMPTS_DIR / f"{name}.txt"
         if prompt_file.exists():
-            return prompt_file.read_text().strip()
+            prompt = prompt_file.read_text().strip()
+            # Inject dynamic values
+            now = datetime.now()
+            prompt = prompt.replace("{current_date}", now.strftime("%B %d, %Y"))
+            prompt = prompt.replace("{current_day}", now.strftime("%A"))
+            return prompt
         return cls.get_default_prompt()
 
     @staticmethod

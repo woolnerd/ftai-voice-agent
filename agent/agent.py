@@ -31,7 +31,7 @@ class VoiceAssistant(Agent):
 
     def __init__(self) -> None:
         super().__init__(
-            instructions=config.load_prompt("default"),
+            instructions=config.load_prompt("medspa"),
         )
 
 
@@ -121,7 +121,7 @@ async def entrypoint(ctx: agents.JobContext):
 
     # Generate initial greeting
     await session.generate_reply(
-        instructions="Greet the caller warmly and introduce yourself as Sunny Hills Realty. Ask how you can help them today with their property search."
+        instructions="Greet the caller warmly and introduce yourself as Nicki from Glow Medical Spa. Ask how you can help them today."
     )
 
 
