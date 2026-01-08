@@ -151,17 +151,21 @@ def parse_time(time_str: str) -> tuple[int, int]:
 async def book_appointment(
     context: RunContext,
     customer_name: Annotated[str, "The customer's full name"],
-    customer_email: Annotated[str, "The customer's email address"],
+    customer_email: Annotated[str, "The customer's email address - must be a valid email like name@example.com"],
     service: Annotated[str, "The service being booked, e.g. 'Botox', 'HydraFacial', 'consultation'"],
     date: Annotated[str, "The appointment date, e.g. 'Thursday, January 16'"],
     time: Annotated[str, "The appointment time, e.g. '2:00 PM'"],
 ) -> str:
-    """Book an appointment for the customer. Call this after confirming all details with the caller."""
+    """Book an appointment for the customer. Only call this after you have the customer's name AND a valid email address."""
     log(f"[TOOL] book_appointment called:")
     log(f"  - Customer: {customer_name}")
     log(f"  - Email: {customer_email}")
     log(f"  - Service: {service}")
     log(f"  - Date/Time: {date} at {time}")
+
+    # Validate email before attempting to book
+    if not customer_email or "@" not in customer_email or customer_email.lower() in ["unknown", "none", "n/a"]:
+        return "I still need the customer's email address to complete the booking. Please ask for their email."
 
     # Parse the date and time
     target_date = parse_date(date)
