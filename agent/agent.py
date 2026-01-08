@@ -3,11 +3,14 @@
 import os
 import time
 import logging
+from datetime import datetime, timedelta
+from typing import Annotated
 from dotenv import load_dotenv
 
 from livekit import agents
 from livekit.agents import (
     AgentSession, Agent, RoomInputOptions,
+    RunContext, function_tool,
     UserInputTranscribedEvent, AgentStateChangedEvent
 )
 from livekit.plugins import noise_cancellation, silero, openai, deepgram, cartesia, groq
@@ -26,12 +29,74 @@ def log(msg):
     print(msg, flush=True)
 
 
+# -----------------------------------------------------------------------------
+# Booking Tools
+# -----------------------------------------------------------------------------
+
+@function_tool()
+async def check_availability(
+    context: RunContext,
+    date: Annotated[str, "The date to check availability for, e.g. 'tomorrow', 'Thursday', or 'January 15'"],
+) -> str:
+    """Check available appointment slots for a given date. Always call this before offering times to the caller."""
+    log(f"[TOOL] check_availability called for date: {date}")
+
+    # TODO: Replace with actual Google Calendar lookup
+    # For now, return mock availability
+    today = datetime.now()
+
+    # Parse relative dates
+    if date.lower() == "tomorrow":
+        target_date = today + timedelta(days=1)
+    elif date.lower() == "today":
+        target_date = today
+    else:
+        # For demo, just use tomorrow
+        target_date = today + timedelta(days=1)
+
+    day_name = target_date.strftime("%A")
+    date_str = target_date.strftime("%B %d")
+
+    # Check if it's a closed day (Sunday/Monday)
+    if target_date.weekday() in [6, 0]:  # Sunday=6, Monday=0
+        return f"The spa is closed on {day_name}s. We're open Tuesday through Saturday, 9am to 6pm."
+
+    # Mock available slots
+    available_slots = ["10:00 AM", "11:30 AM", "2:00 PM", "3:30 PM"]
+    slots_str = ", ".join(available_slots)
+
+    return f"Available slots on {day_name}, {date_str}: {slots_str}"
+
+
+@function_tool()
+async def book_appointment(
+    context: RunContext,
+    customer_name: Annotated[str, "The customer's full name"],
+    customer_email: Annotated[str, "The customer's email address"],
+    service: Annotated[str, "The service being booked, e.g. 'Botox', 'HydraFacial', 'consultation'"],
+    date: Annotated[str, "The appointment date, e.g. 'Thursday, January 16'"],
+    time: Annotated[str, "The appointment time, e.g. '2:00 PM'"],
+) -> str:
+    """Book an appointment for the customer. Call this after confirming all details with the caller."""
+    log(f"[TOOL] book_appointment called:")
+    log(f"  - Customer: {customer_name}")
+    log(f"  - Email: {customer_email}")
+    log(f"  - Service: {service}")
+    log(f"  - Date/Time: {date} at {time}")
+
+    # TODO: Replace with actual Google Calendar booking and Gmail confirmation
+    # For now, simulate a successful booking
+
+    return f"Appointment confirmed! {customer_name} is booked for {service} on {date} at {time}. A confirmation email will be sent to {customer_email}."
+
+
 class VoiceAssistant(Agent):
     """Custom voice assistant agent."""
 
     def __init__(self) -> None:
         super().__init__(
             instructions=config.load_prompt("medspa"),
+            tools=[check_availability, book_appointment],
         )
 
 
