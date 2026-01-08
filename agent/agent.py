@@ -1,6 +1,7 @@
 """FTAI Voice Agent - Main entry point."""
 
 import os
+import re
 import time
 import logging
 from datetime import datetime, timedelta
@@ -16,6 +17,7 @@ from livekit.agents import (
 from livekit.plugins import noise_cancellation, silero, openai, deepgram, cartesia, groq
 
 from config import config
+from calendar_service import calendar_service
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +35,46 @@ def log(msg):
 # Booking Tools
 # -----------------------------------------------------------------------------
 
+def parse_date(date_str: str) -> datetime:
+    """Parse a natural language date into a datetime object."""
+    today = datetime.now()
+    date_lower = date_str.lower().strip()
+
+    # Handle relative dates
+    if date_lower == "today":
+        return today
+    elif date_lower == "tomorrow":
+        return today + timedelta(days=1)
+
+    # Handle day names (e.g., "Thursday", "this Thursday")
+    days = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    for i, day in enumerate(days):
+        if day in date_lower:
+            current_day = today.weekday()
+            days_ahead = i - current_day
+            if days_ahead <= 0:  # Target day already passed this week
+                days_ahead += 7
+            return today + timedelta(days=days_ahead)
+
+    # Try to parse "January 15" or "Jan 15" style dates
+    try:
+        # Try full month name
+        parsed = datetime.strptime(date_str, "%B %d")
+        return parsed.replace(year=today.year)
+    except ValueError:
+        pass
+
+    try:
+        # Try abbreviated month
+        parsed = datetime.strptime(date_str, "%b %d")
+        return parsed.replace(year=today.year)
+    except ValueError:
+        pass
+
+    # Default to tomorrow if we can't parse
+    return today + timedelta(days=1)
+
+
 @function_tool()
 async def check_availability(
     context: RunContext,
@@ -41,19 +83,7 @@ async def check_availability(
     """Check available appointment slots for a given date. Always call this before offering times to the caller."""
     log(f"[TOOL] check_availability called for date: {date}")
 
-    # TODO: Replace with actual Google Calendar lookup
-    # For now, return mock availability
-    today = datetime.now()
-
-    # Parse relative dates
-    if date.lower() == "tomorrow":
-        target_date = today + timedelta(days=1)
-    elif date.lower() == "today":
-        target_date = today
-    else:
-        # For demo, just use tomorrow
-        target_date = today + timedelta(days=1)
-
+    target_date = parse_date(date)
     day_name = target_date.strftime("%A")
     date_str = target_date.strftime("%B %d")
 
@@ -61,11 +91,41 @@ async def check_availability(
     if target_date.weekday() in [6, 0]:  # Sunday=6, Monday=0
         return f"The spa is closed on {day_name}s. We're open Tuesday through Saturday, 9am to 6pm."
 
-    # Mock available slots
-    available_slots = ["10:00 AM", "11:30 AM", "2:00 PM", "3:30 PM"]
-    slots_str = ", ".join(available_slots)
+    # Try to get real availability from Google Calendar
+    if calendar_service.calendar_id:
+        available_slots = calendar_service.get_available_slots(target_date)
+        if available_slots:
+            slots_str = ", ".join(available_slots[:5])  # Limit to 5 slots for voice
+            return f"Available slots on {day_name}, {date_str}: {slots_str}"
+        elif available_slots == []:
+            return f"I'm sorry, we're fully booked on {day_name}, {date_str}. Would you like to check another day?"
 
+    # Fallback to mock data if calendar not configured
+    log("[TOOL] Using mock availability (calendar not configured)")
+    mock_slots = ["10:00 AM", "11:30 AM", "2:00 PM", "3:30 PM"]
+    slots_str = ", ".join(mock_slots)
     return f"Available slots on {day_name}, {date_str}: {slots_str}"
+
+
+def parse_time(time_str: str) -> tuple[int, int]:
+    """Parse a time string into hours and minutes (24h format)."""
+    time_str = time_str.strip().upper()
+
+    # Handle "2:00 PM", "2 PM", "14:00" formats
+    match = re.match(r"(\d{1,2}):?(\d{2})?\s*(AM|PM)?", time_str)
+    if match:
+        hour = int(match.group(1))
+        minute = int(match.group(2)) if match.group(2) else 0
+        period = match.group(3)
+
+        if period == "PM" and hour != 12:
+            hour += 12
+        elif period == "AM" and hour == 12:
+            hour = 0
+
+        return hour, minute
+
+    return 9, 0  # Default to 9 AM
 
 
 @function_tool()
@@ -84,10 +144,33 @@ async def book_appointment(
     log(f"  - Service: {service}")
     log(f"  - Date/Time: {date} at {time}")
 
-    # TODO: Replace with actual Google Calendar booking and Gmail confirmation
-    # For now, simulate a successful booking
+    # Parse the date and time
+    target_date = parse_date(date)
+    hour, minute = parse_time(time)
+    start_time = target_date.replace(hour=hour, minute=minute, second=0, microsecond=0)
 
-    return f"Appointment confirmed! {customer_name} is booked for {service} on {date} at {time}. A confirmation email will be sent to {customer_email}."
+    # Format for response
+    day_name = target_date.strftime("%A")
+    date_str = target_date.strftime("%B %d")
+    time_str = start_time.strftime("%-I:%M %p")
+
+    # Try to create the calendar event
+    if calendar_service.calendar_id:
+        result = calendar_service.create_appointment(
+            customer_name=customer_name,
+            customer_email=customer_email,
+            service_type=service,
+            start_time=start_time,
+        )
+        if result:
+            log(f"[TOOL] Calendar event created: {result}")
+            return f"Appointment confirmed! {customer_name} is booked for {service} on {day_name}, {date_str} at {time_str}. A confirmation email has been sent to {customer_email}."
+        else:
+            return f"I'm sorry, there was an issue booking that time slot. It may have just been taken. Would you like to try a different time?"
+
+    # Fallback if calendar not configured
+    log("[TOOL] Using mock booking (calendar not configured)")
+    return f"Appointment confirmed! {customer_name} is booked for {service} on {day_name}, {date_str} at {time_str}. A confirmation email will be sent to {customer_email}."
 
 
 class VoiceAssistant(Agent):
