@@ -77,6 +77,24 @@ def parse_date(date_str: str) -> datetime:
 
 
 @function_tool()
+async def end_call(
+    context: RunContext,
+    reason: Annotated[str, "Brief reason for ending the call, e.g. 'booking complete', 'caller said goodbye'"],
+) -> str:
+    """End the call after saying goodbye. Use this when the conversation is complete - after a booking is confirmed or when the caller says goodbye."""
+    log(f"[TOOL] end_call called: {reason}")
+
+    # Schedule disconnect after a brief delay to allow final message to play
+    import asyncio
+    async def delayed_disconnect():
+        await asyncio.sleep(3)  # Wait for goodbye message to finish
+        await context.session.aclose()
+
+    asyncio.create_task(delayed_disconnect())
+    return "Call ending. Say a warm goodbye."
+
+
+@function_tool()
 async def check_availability(
     context: RunContext,
     date: Annotated[str, "The date to check availability for, e.g. 'tomorrow', 'Thursday', or 'January 15'"],
@@ -197,7 +215,7 @@ class VoiceAssistant(Agent):
     def __init__(self) -> None:
         super().__init__(
             instructions=config.load_prompt("medspa"),
-            tools=[check_availability, book_appointment],
+            tools=[check_availability, book_appointment, end_call],
         )
 
 
