@@ -22,15 +22,21 @@ class CalendarService:
     def __init__(self):
         self.calendar_id = os.getenv("GOOGLE_CALENDAR_ID")
         self.credentials_file = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "credentials.json")
+        # For domain-wide delegation, impersonate this user
+        self.delegate_user = os.getenv("GOOGLE_DELEGATE_USER", self.calendar_id)
         self._service = None
 
     @property
     def service(self):
-        """Lazy-load the Google Calendar service."""
+        """Lazy-load the Google Calendar service with domain-wide delegation."""
         if self._service is None:
             credentials = service_account.Credentials.from_service_account_file(
                 self.credentials_file, scopes=SCOPES
             )
+            # Use domain-wide delegation to impersonate the user
+            if self.delegate_user:
+                credentials = credentials.with_subject(self.delegate_user)
+                print(f"[CALENDAR] Using domain-wide delegation as: {self.delegate_user}")
             self._service = build("calendar", "v3", credentials=credentials)
         return self._service
 

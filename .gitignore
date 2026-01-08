@@ -61,3 +61,4 @@ htmlcov/
 # LiveKit
 livekit.yaml
 *.pem
+agent/credentials.json
