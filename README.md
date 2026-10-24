@@ -1,15 +1,17 @@
 # FTAI Voice Agent
 
-An open-source voice AI agent that rivals Vapi.ai - built with LiveKit, featuring ultra-low latency (<500ms) and full containerization support.
+A self-hostable voice AI agent built on LiveKit Agents, as an open-source alternative to hosted platforms like Vapi.ai. Runs fully in Docker Compose.
 
 ## Why This Exists
 
-While Vapi.ai offers a convenient SaaS solution, this project demonstrates engineering depth by building a self-hostable alternative that:
+Hosted voice platforms like Vapi.ai are convenient, but you pay per minute and give up control of the stack. This project explores the self-hosted alternative:
 
-- **Reduces costs** by ~40% at scale
-- **Achieves lower latency** (~300-500ms vs ~800ms)
-- **Gives you full control** over data and infrastructure
-- **Proves technical expertise** beyond API integration
+- **Full control** over data, models, and infrastructure
+- **Swappable providers** for speech-to-text (Deepgram), LLM (Groq, originally OpenRouter), and text-to-speech (Cartesia)
+- **Real tool calls**: books appointments in Google Calendar and sends email confirmations
+- **Latency logging**: records speech-to-thinking and thinking-to-speaking time for each turn
+
+Simple turns felt fast in testing, but tool calls added noticeable delay. No latency or cost benchmarks against Vapi have been published.
 
 ## Architecture
 
