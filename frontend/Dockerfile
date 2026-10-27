@@ -1,9 +1,9 @@
-FROM node:20-alpine
+FROM node:24.22.1-alpine
 
 WORKDIR /app
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN npm install -g pnpm@10.34.9
 
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
